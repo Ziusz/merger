@@ -2,16 +2,17 @@
 import os
 import sys
 import argparse
+import fnmatch
 from pathlib import Path
 
-def merge_contracts(src_dir, output_file, extensions=None, exclude_dirs=None):
+def merge_contracts(src_dir, output_file, extensions=None, exclude_patterns=None):
     """Merge all source files in directory into a single file with source comments."""
     
     if extensions is None:
         extensions = ['.sol']
     
-    if exclude_dirs is None:
-        exclude_dirs = ['node_modules', '.git', 'build', 'cache', 'out', 'artifacts']
+    if exclude_patterns is None:
+        exclude_patterns = ['node_modules', '.git', 'build', 'cache', 'out', 'artifacts']
     
     # Ensure extensions start with dot
     extensions = [ext if ext.startswith('.') else f'.{ext}' for ext in extensions]
@@ -19,8 +20,14 @@ def merge_contracts(src_dir, output_file, extensions=None, exclude_dirs=None):
     # Find all matching files
     matched_files = []
     for root, dirs, files in os.walk(src_dir):
-        # Remove excluded directories from search
-        dirs[:] = [d for d in dirs if d not in exclude_dirs]
+        # Exclude directories based on patterns
+        included_dirs = []
+        for d in dirs:
+            # A directory is excluded if it matches ANY of the patterns
+            if not any(fnmatch.fnmatch(d, pattern) for pattern in exclude_patterns):
+                included_dirs.append(d)
+        
+        dirs[:] = included_dirs
         
         for file in files:
             if any(file.endswith(ext) for ext in extensions):
@@ -83,8 +90,11 @@ Examples:
   # Merge multiple file types
   python merger.py . all_code.txt -e py js ts sol
   
-  # Exclude specific directories
+  # Exclude specific directories by name
   python merger.py src/ output.sol --exclude test mocks
+  
+  # Exclude directories using wildcard patterns
+  python merger.py src/ output.sol --exclude '*Test' '*_mocks'
 """
     )
     
@@ -93,7 +103,7 @@ Examples:
     parser.add_argument('-e', '--extensions', nargs='+', 
                         help='File extensions to include (default: sol)')
     parser.add_argument('--exclude', nargs='+', 
-                        help='Directories to exclude from scan')
+                        help='Directory name patterns to exclude from scan (e.g., "mocks", "*Test")')
     
     args = parser.parse_args()
     
@@ -106,11 +116,11 @@ Examples:
     extensions = args.extensions if args.extensions else ['sol']
     
     # Merge exclude directories with defaults
-    exclude_dirs = ['node_modules', '.git', 'build', 'cache', 'out', 'artifacts']
+    exclude_patterns = ['node_modules', '.git', 'build', 'cache', 'out', 'artifacts']
     if args.exclude:
-        exclude_dirs.extend(args.exclude)
+        exclude_patterns.extend(args.exclude)
     
-    merge_contracts(args.src_dir, args.output_file, extensions, exclude_dirs)
+    merge_contracts(args.src_dir, args.output_file, extensions, exclude_patterns)
 
 if __name__ == "__main__":
     main()

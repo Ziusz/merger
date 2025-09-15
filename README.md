@@ -51,9 +51,17 @@ Scan the current directory (`.`) for Python (`.py`), JavaScript (`.js`), TypeScr
 python merger.py . all_code.txt -e py js ts sol
 ```
 
-**4. Exclude Additional Directories**
+**4. Exclude Directories Using Wildcard Patterns**
 
-Merge Solidity contracts from the `src/` directory, but exclude the `test` and `mocks` subdirectories from the process.
+Merge Solidity contracts, but exclude any directory ending with `Test` (e.g., `unitTest`, `integrationTest`) and any directory starting with `temp_`. Note that patterns may need to be quoted in your shell to prevent expansion.
+
+```bash
+python merger.py src/ output.sol --exclude '*Test' 'temp_*'
+```
+
+**5. Exclude Specific Directories by Name**
+
+Merge files while excluding the exact directory names `test` and `mocks`.
 
 ```bash
 python merger.py src/ output.sol --exclude test mocks
