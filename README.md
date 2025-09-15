@@ -66,3 +66,11 @@ Merge files while excluding the exact directory names `test` and `mocks`.
 ```bash
 python merger.py src/ output.sol --exclude test mocks
 ```
+
+**6. Combine Include and Exclude for Precise Control**
+
+This combination first narrows the scan to *only* the `src/contracts` directory, and then within that directory, it excludes any subdirectory ending in `test` (e.g., `unit_test`).
+
+```bash
+python merger.py src/ merged.sol -i contracts --exclude '*test'
+```

@@ -5,7 +5,7 @@ import argparse
 import fnmatch
 from pathlib import Path
 
-def merge_contracts(src_dir, output_file, extensions=None, exclude_patterns=None):
+def merge_contracts(src_dir, output_file, extensions=None, exclude_patterns=None, include_patterns=None):
     """Merge all source files in directory into a single file with source comments."""
     
     if extensions is None:
@@ -17,27 +17,34 @@ def merge_contracts(src_dir, output_file, extensions=None, exclude_patterns=None
     # Ensure extensions start with dot
     extensions = [ext if ext.startswith('.') else f'.{ext}' for ext in extensions]
     
-    # Find all matching files
-    matched_files = []
-    for root, dirs, files in os.walk(src_dir):
-        # Exclude directories based on patterns
-        included_dirs = []
-        for d in dirs:
-            # A directory is excluded if it matches ANY of the patterns
-            if not any(fnmatch.fnmatch(d, pattern) for pattern in exclude_patterns):
-                included_dirs.append(d)
-        
-        dirs[:] = included_dirs
-        
-        for file in files:
-            if any(file.endswith(ext) for ext in extensions):
-                matched_files.append(os.path.join(root, file))
+    # Use a set to prevent duplicate file entries if include paths overlap
+    matched_files_set = set()
     
-    # Sort files for consistent output
-    matched_files.sort()
+    # Determine the search paths; Default to the source directory
+    if include_patterns:
+        search_paths = [os.path.join(src_dir, p) for p in include_patterns]
+    else:
+        search_paths = [src_dir]
+        
+    for path in search_paths:
+        if not os.path.isdir(path):
+            print(f"Warning: Path not found or not a directory, skipping: {path}")
+            continue
+            
+        for root, dirs, files in os.walk(path):
+            # Exclude directories based on patterns
+            dirs[:] = [d for d in dirs if not any(fnmatch.fnmatch(d, pattern) for pattern in exclude_patterns)]
+            
+            for file in files:
+                if any(file.endswith(ext) for ext in extensions):
+                    # Add the absolute path to the set
+                    matched_files_set.add(os.path.join(root, file))
+    
+    # Convert set to a sorted list for consistent output
+    matched_files = sorted(list(matched_files_set))
     
     if not matched_files:
-        print(f"No files with extensions {extensions} found in {src_dir}")
+        print(f"No files with extensions {extensions} found in the specified paths.")
         return
     
     # Write merged content
@@ -81,20 +88,20 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Merge Solidity contracts
+  # Merge all Solidity contracts in the src directory
   python merger.py src/ merged.sol
+  
+  # Merge only the files within the 'core' and 'utils' subdirectories
+  python merger.py src/ merged.sol -i core utils
   
   # Merge TypeScript files
   python merger.py src/ merged.ts -e ts tsx
   
-  # Merge multiple file types
-  python merger.py . all_code.txt -e py js ts sol
-  
-  # Exclude specific directories by name
-  python merger.py src/ output.sol --exclude test mocks
-  
   # Exclude directories using wildcard patterns
   python merger.py src/ output.sol --exclude '*Test' '*_mocks'
+  
+  # Combine include and exclude: only scan 'contracts', but ignore 'test' subfolders within it
+  python merger.py . all_code.txt -i contracts --exclude '*test' -e sol
 """
     )
     
@@ -102,6 +109,8 @@ Examples:
     parser.add_argument('output_file', help='Output file path')
     parser.add_argument('-e', '--extensions', nargs='+', 
                         help='File extensions to include (default: sol)')
+    parser.add_argument('-i', '--include', nargs='+', 
+                        help='Directory paths to include; If specified, only these directories will be scanned (e.g., "contracts", "utils")')
     parser.add_argument('--exclude', nargs='+', 
                         help='Directory name patterns to exclude from scan (e.g., "mocks", "*Test")')
     
@@ -120,7 +129,7 @@ Examples:
     if args.exclude:
         exclude_patterns.extend(args.exclude)
     
-    merge_contracts(args.src_dir, args.output_file, extensions, exclude_patterns)
+    merge_contracts(args.src_dir, args.output_file, extensions, exclude_patterns, args.include)
 
 if __name__ == "__main__":
     main()
